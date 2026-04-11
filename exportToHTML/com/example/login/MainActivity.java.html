@@ -1,0 +1,133 @@
+<html>
+<head>
+<title>MainActivity.java</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+.s0 { color: #cf8e6d;}
+.s1 { color: #bcbec4;}
+.s2 { color: #bcbec4;}
+.s3 { color: #6aab73;}
+.s4 { color: #7a7e85;}
+</style>
+</head>
+<body bgcolor="#191a1c">
+<table CELLSPACING=0 CELLPADDING=5 COLS=1 WIDTH="100%" BGCOLOR="#606060" >
+<tr><td><center>
+<font face="Arial, Helvetica" color="#000000">
+MainActivity.java</font>
+</center></td></tr></table>
+<pre><span class="s0">package </span><span class="s1">com</span><span class="s2">.</span><span class="s1">example</span><span class="s2">.</span><span class="s1">login</span><span class="s2">;</span>
+
+<span class="s0">import </span><span class="s1">android</span><span class="s2">.</span><span class="s1">content</span><span class="s2">.</span><span class="s1">Intent</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">android</span><span class="s2">.</span><span class="s1">os</span><span class="s2">.</span><span class="s1">Bundle</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">android</span><span class="s2">.</span><span class="s1">text</span><span class="s2">.</span><span class="s1">Editable</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">android</span><span class="s2">.</span><span class="s1">text</span><span class="s2">.</span><span class="s1">TextWatcher</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">android</span><span class="s2">.</span><span class="s1">widget</span><span class="s2">.</span><span class="s1">Button</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">android</span><span class="s2">.</span><span class="s1">widget</span><span class="s2">.</span><span class="s1">ImageButton</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">android</span><span class="s2">.</span><span class="s1">widget</span><span class="s2">.</span><span class="s1">Toast</span><span class="s2">;</span>
+
+<span class="s0">import </span><span class="s1">androidx</span><span class="s2">.</span><span class="s1">appcompat</span><span class="s2">.</span><span class="s1">app</span><span class="s2">.</span><span class="s1">AppCompatActivity</span><span class="s2">;</span>
+
+<span class="s0">import </span><span class="s1">com</span><span class="s2">.</span><span class="s1">google</span><span class="s2">.</span><span class="s1">android</span><span class="s2">.</span><span class="s1">material</span><span class="s2">.</span><span class="s1">textfield</span><span class="s2">.</span><span class="s1">TextInputEditText</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">com</span><span class="s2">.</span><span class="s1">google</span><span class="s2">.</span><span class="s1">firebase</span><span class="s2">.</span><span class="s1">auth</span><span class="s2">.</span><span class="s1">FirebaseAuth</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">com</span><span class="s2">.</span><span class="s1">google</span><span class="s2">.</span><span class="s1">firebase</span><span class="s2">.</span><span class="s1">auth</span><span class="s2">.</span><span class="s1">FirebaseUser</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">com</span><span class="s2">.</span><span class="s1">google</span><span class="s2">.</span><span class="s1">firebase</span><span class="s2">.</span><span class="s1">database</span><span class="s2">.</span><span class="s1">DatabaseReference</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">com</span><span class="s2">.</span><span class="s1">google</span><span class="s2">.</span><span class="s1">firebase</span><span class="s2">.</span><span class="s1">database</span><span class="s2">.</span><span class="s1">FirebaseDatabase</span><span class="s2">;</span>
+
+<span class="s0">import </span><span class="s1">java</span><span class="s2">.</span><span class="s1">text</span><span class="s2">.</span><span class="s1">SimpleDateFormat</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">java</span><span class="s2">.</span><span class="s1">util</span><span class="s2">.</span><span class="s1">Date</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">java</span><span class="s2">.</span><span class="s1">util</span><span class="s2">.</span><span class="s1">Locale</span><span class="s2">;</span>
+
+<span class="s0">public class </span><span class="s1">MainActivity </span><span class="s0">extends </span><span class="s1">AppCompatActivity </span><span class="s2">{</span>
+
+    <span class="s0">private static final </span><span class="s1">String ADMIN_CODE </span><span class="s2">= </span><span class="s3">&quot;100772&quot;</span><span class="s2">;</span>
+    
+    <span class="s0">private </span><span class="s1">FirebaseAuth mAuth</span><span class="s2">;</span>
+    <span class="s0">private </span><span class="s1">DatabaseReference mDatabase</span><span class="s2">;</span>
+    
+    <span class="s0">private </span><span class="s1">TextInputEditText studentIdEditText</span><span class="s2">, </span><span class="s1">passwordEditText</span><span class="s2">, </span><span class="s1">adminCodeEditText</span><span class="s2">;</span>
+
+    <span class="s1">@Override</span>
+    <span class="s0">protected void </span><span class="s1">onCreate</span><span class="s2">(</span><span class="s1">Bundle savedInstanceState</span><span class="s2">) {</span>
+        <span class="s0">super</span><span class="s2">.</span><span class="s1">onCreate</span><span class="s2">(</span><span class="s1">savedInstanceState</span><span class="s2">);</span>
+        <span class="s1">setContentView</span><span class="s2">(</span><span class="s1">R</span><span class="s2">.</span><span class="s1">layout</span><span class="s2">.</span><span class="s1">activity_main</span><span class="s2">);</span>
+
+        <span class="s1">mAuth </span><span class="s2">= </span><span class="s1">FirebaseAuth</span><span class="s2">.</span><span class="s1">getInstance</span><span class="s2">();</span>
+        <span class="s1">mDatabase </span><span class="s2">= </span><span class="s1">FirebaseDatabase</span><span class="s2">.</span><span class="s1">getInstance</span><span class="s2">().</span><span class="s1">getReference</span><span class="s2">(</span><span class="s3">&quot;login_logs&quot;</span><span class="s2">);</span>
+
+        <span class="s1">studentIdEditText </span><span class="s2">= </span><span class="s1">findViewById</span><span class="s2">(</span><span class="s1">R</span><span class="s2">.</span><span class="s1">id</span><span class="s2">.</span><span class="s1">studentIdEditText</span><span class="s2">);</span>
+        <span class="s1">passwordEditText </span><span class="s2">= </span><span class="s1">findViewById</span><span class="s2">(</span><span class="s1">R</span><span class="s2">.</span><span class="s1">id</span><span class="s2">.</span><span class="s1">passwordEditText</span><span class="s2">);</span>
+        <span class="s1">adminCodeEditText </span><span class="s2">= </span><span class="s1">findViewById</span><span class="s2">(</span><span class="s1">R</span><span class="s2">.</span><span class="s1">id</span><span class="s2">.</span><span class="s1">adminCodeEditText</span><span class="s2">);</span>
+        <span class="s1">Button loginButton </span><span class="s2">= </span><span class="s1">findViewById</span><span class="s2">(</span><span class="s1">R</span><span class="s2">.</span><span class="s1">id</span><span class="s2">.</span><span class="s1">loginButton</span><span class="s2">);</span>
+        <span class="s1">Button registerButton </span><span class="s2">= </span><span class="s1">findViewById</span><span class="s2">(</span><span class="s1">R</span><span class="s2">.</span><span class="s1">id</span><span class="s2">.</span><span class="s1">registerButton</span><span class="s2">);</span>
+        <span class="s1">ImageButton backButton </span><span class="s2">= </span><span class="s1">findViewById</span><span class="s2">(</span><span class="s1">R</span><span class="s2">.</span><span class="s1">id</span><span class="s2">.</span><span class="s1">backButton</span><span class="s2">);</span>
+
+        <span class="s4">// Open Register Activity</span>
+        <span class="s1">registerButton</span><span class="s2">.</span><span class="s1">setOnClickListener</span><span class="s2">(</span><span class="s1">v -&gt; </span><span class="s2">{</span>
+            <span class="s1">Intent intent </span><span class="s2">= </span><span class="s0">new </span><span class="s1">Intent</span><span class="s2">(</span><span class="s1">MainActivity</span><span class="s2">.</span><span class="s0">this</span><span class="s2">, </span><span class="s1">RegisterActivity</span><span class="s2">.</span><span class="s0">class</span><span class="s2">);</span>
+            <span class="s1">startActivity</span><span class="s2">(</span><span class="s1">intent</span><span class="s2">);</span>
+        <span class="s2">});</span>
+
+        <span class="s4">// 1. Simple Login Logic (Student ID + Password)</span>
+        <span class="s1">loginButton</span><span class="s2">.</span><span class="s1">setOnClickListener</span><span class="s2">(</span><span class="s1">v -&gt; </span><span class="s2">{</span>
+            <span class="s1">String studentId </span><span class="s2">= </span><span class="s1">studentIdEditText</span><span class="s2">.</span><span class="s1">getText</span><span class="s2">() != </span><span class="s0">null </span><span class="s2">? </span><span class="s1">studentIdEditText</span><span class="s2">.</span><span class="s1">getText</span><span class="s2">().</span><span class="s1">toString</span><span class="s2">().</span><span class="s1">trim</span><span class="s2">() : </span><span class="s3">&quot;&quot;</span><span class="s2">;</span>
+            <span class="s1">String password </span><span class="s2">= </span><span class="s1">passwordEditText</span><span class="s2">.</span><span class="s1">getText</span><span class="s2">() != </span><span class="s0">null </span><span class="s2">? </span><span class="s1">passwordEditText</span><span class="s2">.</span><span class="s1">getText</span><span class="s2">().</span><span class="s1">toString</span><span class="s2">().</span><span class="s1">trim</span><span class="s2">() : </span><span class="s3">&quot;&quot;</span><span class="s2">;</span>
+
+            <span class="s0">if </span><span class="s2">(</span><span class="s1">studentId</span><span class="s2">.</span><span class="s1">isEmpty</span><span class="s2">() || </span><span class="s1">password</span><span class="s2">.</span><span class="s1">isEmpty</span><span class="s2">()) {</span>
+                <span class="s1">Toast</span><span class="s2">.</span><span class="s1">makeText</span><span class="s2">(</span><span class="s0">this</span><span class="s2">, </span><span class="s3">&quot;학번과 비밀번호를 입력하세요.&quot;</span><span class="s2">, </span><span class="s1">Toast</span><span class="s2">.</span><span class="s1">LENGTH_SHORT</span><span class="s2">).</span><span class="s1">show</span><span class="s2">();</span>
+                <span class="s0">return</span><span class="s2">;</span>
+            <span class="s2">}</span>
+
+            <span class="s4">// Convert student ID to internal email format used during registration</span>
+            <span class="s1">String email </span><span class="s2">= </span><span class="s1">studentId </span><span class="s2">+ </span><span class="s3">&quot;@syuin.ac.kr&quot;</span><span class="s2">;</span>
+
+            <span class="s1">mAuth</span><span class="s2">.</span><span class="s1">signInWithEmailAndPassword</span><span class="s2">(</span><span class="s1">email</span><span class="s2">, </span><span class="s1">password</span><span class="s2">)</span>
+                    <span class="s2">.</span><span class="s1">addOnCompleteListener</span><span class="s2">(</span><span class="s0">this</span><span class="s2">, </span><span class="s1">task -&gt; </span><span class="s2">{</span>
+                        <span class="s0">if </span><span class="s2">(</span><span class="s1">task</span><span class="s2">.</span><span class="s1">isSuccessful</span><span class="s2">()) {</span>
+                            <span class="s1">proceedToMainScreen</span><span class="s2">(</span><span class="s1">email</span><span class="s2">);</span>
+                        <span class="s2">} </span><span class="s0">else </span><span class="s2">{</span>
+                            <span class="s1">Toast</span><span class="s2">.</span><span class="s1">makeText</span><span class="s2">(</span><span class="s1">MainActivity</span><span class="s2">.</span><span class="s0">this</span><span class="s2">, </span><span class="s3">&quot;로그인 실패. 학번 또는 비밀번호를 확인하세요.&quot;</span><span class="s2">, </span><span class="s1">Toast</span><span class="s2">.</span><span class="s1">LENGTH_SHORT</span><span class="s2">).</span><span class="s1">show</span><span class="s2">();</span>
+                        <span class="s2">}</span>
+                    <span class="s2">});</span>
+        <span class="s2">});</span>
+        
+        <span class="s1">backButton</span><span class="s2">.</span><span class="s1">setOnClickListener</span><span class="s2">(</span><span class="s1">v -&gt; onBackPressed</span><span class="s2">());</span>
+
+        <span class="s4">// Admin Mode listener</span>
+        <span class="s1">adminCodeEditText</span><span class="s2">.</span><span class="s1">addTextChangedListener</span><span class="s2">(</span><span class="s0">new </span><span class="s1">TextWatcher</span><span class="s2">() {</span>
+            <span class="s1">@Override</span>
+            <span class="s0">public void </span><span class="s1">beforeTextChanged</span><span class="s2">(</span><span class="s1">CharSequence s</span><span class="s2">, </span><span class="s0">int </span><span class="s1">start</span><span class="s2">, </span><span class="s0">int </span><span class="s1">count</span><span class="s2">, </span><span class="s0">int </span><span class="s1">after</span><span class="s2">) {}</span>
+
+            <span class="s1">@Override</span>
+            <span class="s0">public void </span><span class="s1">onTextChanged</span><span class="s2">(</span><span class="s1">CharSequence s</span><span class="s2">, </span><span class="s0">int </span><span class="s1">start</span><span class="s2">, </span><span class="s0">int </span><span class="s1">before</span><span class="s2">, </span><span class="s0">int </span><span class="s1">count</span><span class="s2">) {</span>
+                <span class="s0">if </span><span class="s2">(</span><span class="s1">s</span><span class="s2">.</span><span class="s1">toString</span><span class="s2">().</span><span class="s1">equals</span><span class="s2">(</span><span class="s1">ADMIN_CODE</span><span class="s2">)) {</span>
+                    <span class="s1">enterAdminMode</span><span class="s2">();</span>
+                <span class="s2">}</span>
+            <span class="s2">}</span>
+
+            <span class="s1">@Override</span>
+            <span class="s0">public void </span><span class="s1">afterTextChanged</span><span class="s2">(</span><span class="s1">Editable s</span><span class="s2">) {}</span>
+        <span class="s2">});</span>
+    <span class="s2">}</span>
+
+    <span class="s0">private void </span><span class="s1">enterAdminMode</span><span class="s2">() {</span>
+        <span class="s1">Toast</span><span class="s2">.</span><span class="s1">makeText</span><span class="s2">(</span><span class="s0">this</span><span class="s2">, </span><span class="s3">&quot;관리자 모드 실행&quot;</span><span class="s2">, </span><span class="s1">Toast</span><span class="s2">.</span><span class="s1">LENGTH_SHORT</span><span class="s2">).</span><span class="s1">show</span><span class="s2">();</span>
+        <span class="s1">Intent intent </span><span class="s2">= </span><span class="s0">new </span><span class="s1">Intent</span><span class="s2">(</span><span class="s0">this</span><span class="s2">, </span><span class="s1">AdminLogActivity</span><span class="s2">.</span><span class="s0">class</span><span class="s2">);</span>
+        <span class="s1">startActivity</span><span class="s2">(</span><span class="s1">intent</span><span class="s2">);</span>
+        <span class="s1">adminCodeEditText</span><span class="s2">.</span><span class="s1">setText</span><span class="s2">(</span><span class="s3">&quot;&quot;</span><span class="s2">);</span>
+    <span class="s2">}</span>
+
+    <span class="s0">private void </span><span class="s1">proceedToMainScreen</span><span class="s2">(</span><span class="s1">String email</span><span class="s2">) {</span>
+        <span class="s4">// Log the login event</span>
+        <span class="s1">String timestamp </span><span class="s2">= </span><span class="s0">new </span><span class="s1">SimpleDateFormat</span><span class="s2">(</span><span class="s3">&quot;yyyy-MM-dd HH:mm:ss&quot;</span><span class="s2">, </span><span class="s1">Locale</span><span class="s2">.</span><span class="s1">getDefault</span><span class="s2">()).</span><span class="s1">format</span><span class="s2">(</span><span class="s0">new </span><span class="s1">Date</span><span class="s2">());</span>
+        <span class="s1">AdminLogActivity</span><span class="s2">.</span><span class="s1">LogEntry logEntry </span><span class="s2">= </span><span class="s0">new </span><span class="s1">AdminLogActivity</span><span class="s2">.</span><span class="s1">LogEntry</span><span class="s2">(</span><span class="s1">email</span><span class="s2">, </span><span class="s1">timestamp</span><span class="s2">);</span>
+        <span class="s1">mDatabase</span><span class="s2">.</span><span class="s1">push</span><span class="s2">().</span><span class="s1">setValue</span><span class="s2">(</span><span class="s1">logEntry</span><span class="s2">);</span>
+
+        <span class="s1">Toast</span><span class="s2">.</span><span class="s1">makeText</span><span class="s2">(</span><span class="s0">this</span><span class="s2">, </span><span class="s3">&quot;로그인 성공!&quot;</span><span class="s2">, </span><span class="s1">Toast</span><span class="s2">.</span><span class="s1">LENGTH_SHORT</span><span class="s2">).</span><span class="s1">show</span><span class="s2">();</span>
+        <span class="s1">Intent intent </span><span class="s2">= </span><span class="s0">new </span><span class="s1">Intent</span><span class="s2">(</span><span class="s0">this</span><span class="s2">, </span><span class="s1">HomeActivity</span><span class="s2">.</span><span class="s0">class</span><span class="s2">);</span>
+        <span class="s1">startActivity</span><span class="s2">(</span><span class="s1">intent</span><span class="s2">);</span>
+        <span class="s1">finish</span><span class="s2">();</span>
+    <span class="s2">}</span>
+<span class="s2">}</span></pre>
+</body>
+</html>
