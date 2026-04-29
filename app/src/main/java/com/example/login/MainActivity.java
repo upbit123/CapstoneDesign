@@ -68,7 +68,9 @@ public class MainActivity extends AppCompatActivity {
                         if (task.isSuccessful()) {
                             proceedToMainScreen(email);
                         } else {
-                            Toast.makeText(MainActivity.this, "로그인 실패. 학번 또는 비밀번호를 확인하세요.", Toast.LENGTH_SHORT).show();
+                            // Firebase에서 제공하는 구체적인 에러 원인을 표시합니다.
+                            String errorMsg = task.getException() != null ? task.getException().getMessage() : "정보를 확인하세요.";
+                            Toast.makeText(MainActivity.this, "로그인 실패: " + errorMsg, Toast.LENGTH_LONG).show();
                         }
                     });
         });
