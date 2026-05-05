@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "636839625299",
+    "project_id": "chatroom-864ab",
+    "storage_bucket": "chatroom-864ab.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:636839625299:android:155b984617f4bfa82c3ca6",
+        "android_client_info": {
+          "package_name": "com.capstone.taxiApp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA_XBQHCbqERZl6NXC5wdK90yvef4k2pb0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
