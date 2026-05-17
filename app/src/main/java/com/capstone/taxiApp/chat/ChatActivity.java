@@ -9,6 +9,10 @@ import com.google.firebase.firestore.ListenerRegistration;
 
 public class ChatActivity extends AppCompatActivity {
 
+    private String roomId;
+    private String senderUserId;
+    private String senderName;
+
     TextView messageView;
     EditText input;
     Button sendBtn;
@@ -30,7 +34,7 @@ public class ChatActivity extends AppCompatActivity {
         repo = new ChatRepository();
 
         sendBtn.setOnClickListener(v -> {
-            repo.sendMessage(roomId, "user1", "김용성", input.getText().toString());
+            repo.sendMessage(roomId, senderUserId, senderName, input.getText().toString());
             input.setText("");
         });
 
