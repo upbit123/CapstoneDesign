@@ -25,6 +25,7 @@ public class MainActivity extends AppCompatActivity {
         TextInputEditText passwordEditText = findViewById(R.id.passwordEditText);
         Button loginButton = findViewById(R.id.loginButton);
         Button registerButton = findViewById(R.id.registerButton);
+        Button locationCheckButton = findViewById(R.id.locationCheckButton);
 
         loginButton.setOnClickListener(v -> {
             String studentId = getText(studentIdEditText);
@@ -51,6 +52,9 @@ public class MainActivity extends AppCompatActivity {
 
         registerButton.setOnClickListener(v ->
                 startActivity(new Intent(MainActivity.this, RegisterActivity.class)));
+
+        locationCheckButton.setOnClickListener(v ->
+                startActivity(new Intent(MainActivity.this, LocationCheckActivity.class)));
     }
 
     private String getText(TextInputEditText editText) {

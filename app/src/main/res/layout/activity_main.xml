@@ -84,6 +84,14 @@
                 android:layout_marginTop="8dp"
                 android:text="회원가입"
                 android:textColor="#0C356A" />
+
+            <Button
+                android:id="@+id/locationCheckButton"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="위치 인증 테스트" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
