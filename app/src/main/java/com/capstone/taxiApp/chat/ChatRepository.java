@@ -4,7 +4,7 @@ import com.google.firebase.firestore.*;
 import java.util.HashMap;
 import java.util.Map;
 
-public class ChatService {
+public class ChatRepository {
 
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
 
