@@ -1,6 +1,7 @@
 package com.capstone.taxiApp;
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.util.Log;
@@ -30,9 +31,7 @@ import com.google.android.gms.maps.model.MarkerOptions;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -42,16 +41,24 @@ import java.util.List;
 
 public class LocationCheckActivity extends AppCompatActivity implements OnMapReadyCallback {
 
+    public static final String EXTRA_TARGET_ZONE_ID = "target_zone_id";
+    public static final String EXTRA_TARGET_ZONE_NAME = "target_zone_name";
+    public static final String EXTRA_DIRECTION_TYPE = "direction_type";
+
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1001;
     private static final String TAG = "GPS_AUTH";
-    private static final long DEFAULT_USER_ID = 1L;
-    private static final long DEFAULT_UNIVERSITY_ID = 1L;
     private static final String BACKEND_BASE_URL = "http://10.0.2.2:8080";
 
     private GoogleMap googleMap;
     private GpsTracker gpsTracker;
     private TextView statusText;
+    private TextView routeSummaryText;
     private List<VerificationPolicy> verificationPolicies = new ArrayList<>();
+    private SessionManager sessionManager;
+    private MatchRequestRepository matchRequestRepository;
+    private long targetZoneId;
+    private String targetZoneName;
+    private String directionType;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -65,9 +72,17 @@ public class LocationCheckActivity extends AppCompatActivity implements OnMapRea
         });
 
         gpsTracker = new GpsTracker(this);
+        sessionManager = new SessionManager(this);
+        matchRequestRepository = new MatchRequestRepository();
         statusText = findViewById(R.id.tvStatus);
+        routeSummaryText = findViewById(R.id.tvRouteSummary);
         Button verifyButton = findViewById(R.id.btnVerifyLocation);
         verifyButton.setOnClickListener(v -> verifyCurrentLocation());
+
+        targetZoneId = getIntent().getLongExtra(EXTRA_TARGET_ZONE_ID, -1L);
+        targetZoneName = getIntent().getStringExtra(EXTRA_TARGET_ZONE_NAME);
+        directionType = getIntent().getStringExtra(EXTRA_DIRECTION_TYPE);
+        routeSummaryText.setText(buildRouteSummary());
 
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
@@ -148,12 +163,28 @@ public class LocationCheckActivity extends AppCompatActivity implements OnMapRea
     }
 
     private void verifyCurrentLocation() {
+        if (!sessionManager.hasActiveSession()) {
+            statusText.setText("로그인 후 다시 시도해 주세요.");
+            Toast.makeText(this, "백엔드 로그인 세션이 없습니다.", Toast.LENGTH_SHORT).show();
+            return;
+        }
         statusText.setText("정밀 GPS 현재 위치를 조회 중입니다...");
         gpsTracker.getCurrentLocation(new GpsTracker.OnLocationReceivedListener() {
             @Override
             public void onReceived(@NonNull GpsTracker.LocationSnapshot snapshot) {
-                statusText.setText("정밀 GPS 위치를 서버에 저장/인증 중입니다...");
-                verifyLocationWithServer(snapshot);
+                FirebaseTokenHelper.fetchIdToken(new FirebaseTokenHelper.TokenCallback() {
+                    @Override
+                    public void onSuccess(@NonNull String idToken) {
+                        statusText.setText("정밀 GPS 위치를 서버에 저장/인증 중입니다...");
+                        verifyLocationWithServer(snapshot, idToken);
+                    }
+
+                    @Override
+                    public void onFailure(@NonNull String message) {
+                        statusText.setText("토큰 발급 실패: " + message);
+                        Toast.makeText(LocationCheckActivity.this, message, Toast.LENGTH_SHORT).show();
+                    }
+                });
             }
 
             @Override
@@ -164,7 +195,10 @@ public class LocationCheckActivity extends AppCompatActivity implements OnMapRea
         });
     }
 
-    private void verifyLocationWithServer(@NonNull GpsTracker.LocationSnapshot snapshot) {
+    private void verifyLocationWithServer(
+            @NonNull GpsTracker.LocationSnapshot snapshot,
+            @NonNull String idToken
+    ) {
         new Thread(() -> {
             HttpURLConnection connection = null;
             try {
@@ -175,10 +209,9 @@ public class LocationCheckActivity extends AppCompatActivity implements OnMapRea
                 connection.setReadTimeout(7000);
                 connection.setDoOutput(true);
                 connection.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+                connection.setRequestProperty("Authorization", "Bearer " + idToken);
 
                 JSONObject requestBody = new JSONObject();
-                requestBody.put("userId", DEFAULT_USER_ID);
-                requestBody.put("universityId", DEFAULT_UNIVERSITY_ID);
                 requestBody.put("requestPurpose", "GPS_PRECISION_VERIFY");
                 requestBody.put("latitude", snapshot.getLatitude());
                 requestBody.put("longitude", snapshot.getLongitude());
@@ -199,14 +232,14 @@ public class LocationCheckActivity extends AppCompatActivity implements OnMapRea
 
                 VerificationOutcome outcome = parseVerificationOutcomeFromServer(body);
                 runOnUiThread(() -> {
-                    renderVerificationResult(snapshot, outcome);
+                    renderVerificationResult(snapshot, outcome, idToken);
                     logVerificationAudit(snapshot, outcome);
                 });
             } catch (Exception e) {
                 Log.e(TAG, "서버 기반 위치 인증 실패", e);
                 VerificationOutcome fallbackOutcome = verifyAgainstPolicies(snapshot, verificationPolicies);
                 runOnUiThread(() -> {
-                    renderVerificationResult(snapshot, fallbackOutcome);
+                    renderVerificationResult(snapshot, fallbackOutcome, null);
                     logVerificationAudit(snapshot, fallbackOutcome);
                     Toast.makeText(
                             LocationCheckActivity.this,
@@ -223,43 +256,60 @@ public class LocationCheckActivity extends AppCompatActivity implements OnMapRea
     }
 
     private void fetchVerificationPoliciesFromServer() {
-        new Thread(() -> {
-            HttpURLConnection connection = null;
-            try {
-                URL url = new URL(BACKEND_BASE_URL + "/api/v1/location-verification/policies/" + DEFAULT_UNIVERSITY_ID);
-                connection = (HttpURLConnection) url.openConnection();
-                connection.setRequestMethod("GET");
-                connection.setConnectTimeout(7000);
-                connection.setReadTimeout(7000);
+        if (!sessionManager.hasActiveSession()) {
+            statusText.setText("로그인 후 인증 구역을 불러올 수 있습니다.");
+            return;
+        }
+        FirebaseTokenHelper.fetchIdToken(new FirebaseTokenHelper.TokenCallback() {
+            @Override
+            public void onSuccess(@NonNull String idToken) {
+                new Thread(() -> {
+                    HttpURLConnection connection = null;
+                    try {
+                        URL url = new URL(BACKEND_BASE_URL + "/api/v1/location-verification/policies/me");
+                        connection = (HttpURLConnection) url.openConnection();
+                        connection.setRequestMethod("GET");
+                        connection.setConnectTimeout(7000);
+                        connection.setReadTimeout(7000);
+                        connection.setRequestProperty("Authorization", "Bearer " + idToken);
 
-                int responseCode = connection.getResponseCode();
-                InputStream stream = responseCode >= 200 && responseCode < 300
-                        ? connection.getInputStream()
-                        : connection.getErrorStream();
-                String body = readStream(stream);
-                if (responseCode < 200 || responseCode >= 300) {
-                    throw new IllegalStateException("정책 조회 실패 (HTTP " + responseCode + ")");
-                }
+                        int responseCode = connection.getResponseCode();
+                        InputStream stream = responseCode >= 200 && responseCode < 300
+                                ? connection.getInputStream()
+                                : connection.getErrorStream();
+                        String body = readStream(stream);
+                        if (responseCode < 200 || responseCode >= 300) {
+                            throw new IllegalStateException("정책 조회 실패 (HTTP " + responseCode + ")");
+                        }
 
-                List<VerificationPolicy> loadedPolicies = parsePolicies(body);
-                runOnUiThread(() -> {
-                    verificationPolicies = loadedPolicies;
-                    statusText.setText(buildReadyMessage());
-                    renderVerificationZone(null, null);
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "인증 구역 로딩 실패", e);
-                runOnUiThread(() -> {
-                    verificationPolicies = Collections.emptyList();
-                    statusText.setText("인증 구역 로딩 실패: 서버 연결을 확인하세요.");
-                    Toast.makeText(LocationCheckActivity.this, "인증 구역을 불러오지 못했습니다.", Toast.LENGTH_SHORT).show();
-                });
-            } finally {
-                if (connection != null) {
-                    connection.disconnect();
-                }
+                        List<VerificationPolicy> loadedPolicies = parsePolicies(body);
+                        runOnUiThread(() -> {
+                            verificationPolicies = loadedPolicies;
+                            statusText.setText(buildReadyMessage());
+                            renderVerificationZone(null, null);
+                        });
+                    } catch (Exception e) {
+                        Log.e(TAG, "인증 구역 로딩 실패", e);
+                        runOnUiThread(() -> {
+                            verificationPolicies = Collections.emptyList();
+                            statusText.setText("인증 구역 로딩 실패: 서버 연결을 확인하세요.");
+                            Toast.makeText(LocationCheckActivity.this, "인증 구역을 불러오지 못했습니다.", Toast.LENGTH_SHORT).show();
+                        });
+                    } finally {
+                        if (connection != null) {
+                            connection.disconnect();
+                        }
+                    }
+                }).start();
             }
-        }).start();
+
+            @Override
+            public void onFailure(@NonNull String message) {
+                verificationPolicies = Collections.emptyList();
+                statusText.setText("토큰 발급 실패: " + message);
+                Toast.makeText(LocationCheckActivity.this, message, Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     @NonNull
@@ -378,7 +428,8 @@ public class LocationCheckActivity extends AppCompatActivity implements OnMapRea
 
     private void renderVerificationResult(
             @NonNull GpsTracker.LocationSnapshot snapshot,
-            @NonNull VerificationOutcome outcome
+            @NonNull VerificationOutcome outcome,
+            String idToken
     ) {
         String zoneName = outcome.matchedPolicy != null ? outcome.matchedPolicy.zoneName : "없음";
         statusText.setText(
@@ -393,6 +444,79 @@ public class LocationCheckActivity extends AppCompatActivity implements OnMapRea
         if (outcome.hasSavedLocation()) {
             renderSavedLocationOnMap(outcome.savedLatitude, outcome.savedLongitude);
         }
+
+        if (outcome.approved) {
+            if (idToken == null || idToken.isBlank()) {
+                Toast.makeText(this, "매칭 요청 토큰이 없어 대기 화면으로 이동할 수 없습니다.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (outcome.matchedPolicy == null || outcome.matchedPolicy.zoneId <= 0L) {
+                Toast.makeText(this, "인증된 출발 구역 정보를 찾을 수 없습니다.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (targetZoneId <= 0L || directionType == null || directionType.isBlank()) {
+                Toast.makeText(this, "목적지 정보가 올바르지 않습니다.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            createMatchRequestAndOpenWaiting(
+                    idToken,
+                    outcome.matchedPolicy.zoneId,
+                    zoneName
+            );
+        }
+    }
+
+    private void createMatchRequestAndOpenWaiting(
+            @NonNull String idToken,
+            long startZoneId,
+            @NonNull String startZoneName
+    ) {
+        statusText.setText("매칭 요청을 생성하는 중입니다...");
+        new Thread(() -> {
+            try {
+                MatchRequestRepository.MatchRequestResult result = matchRequestRepository.createMatchRequest(
+                        idToken,
+                        startZoneId,
+                        targetZoneId,
+                        directionType
+                );
+
+                runOnUiThread(() -> {
+                    Toast.makeText(this, result.message(), Toast.LENGTH_SHORT).show();
+                    Intent intent = new Intent(this, MatchingWaitActivity.class);
+                    intent.putExtra(MatchingWaitActivity.EXTRA_START_ZONE_NAME, startZoneName);
+                    intent.putExtra(MatchingWaitActivity.EXTRA_TARGET_ZONE_NAME, targetZoneName);
+                    intent.putExtra(MatchingWaitActivity.EXTRA_DIRECTION_TYPE, directionType);
+                    intent.putExtra(MatchingWaitActivity.EXTRA_REQUEST_ID, result.requestId());
+                    intent.putExtra(MatchingWaitActivity.EXTRA_REQUEST_STATUS, result.requestStatus());
+                    intent.putExtra(MatchingWaitActivity.EXTRA_MATCHED, result.matched());
+                    intent.putExtra(MatchingWaitActivity.EXTRA_CHAT_ROOM_ID, result.chatRoomId());
+                    intent.putExtra(MatchingWaitActivity.EXTRA_ROOM_TITLE, result.roomTitle());
+
+                    if (result.matched() && result.chatRoomId() > 0L) {
+                        SessionManager sessionManager = new SessionManager(this);
+                        Intent chatIntent = new Intent(this, com.capstone.taxiApp.chat.ChatActivity.class);
+                        chatIntent.putExtra(com.capstone.taxiApp.chat.ChatActivity.EXTRA_ROOM_ID, "chat-room-" + result.chatRoomId());
+                        chatIntent.putExtra(
+                                com.capstone.taxiApp.chat.ChatActivity.EXTRA_ROOM_TITLE,
+                                result.roomTitle().isBlank() ? startZoneName + " -> " + targetZoneName : result.roomTitle()
+                        );
+                        chatIntent.putExtra(com.capstone.taxiApp.chat.ChatActivity.EXTRA_SENDER_USER_ID, String.valueOf(sessionManager.getUserId()));
+                        chatIntent.putExtra(com.capstone.taxiApp.chat.ChatActivity.EXTRA_SENDER_NAME, sessionManager.getDisplayName());
+                        startActivity(chatIntent);
+                    } else {
+                        startActivity(intent);
+                    }
+                });
+            } catch (Exception exception) {
+                runOnUiThread(() -> Toast.makeText(
+                        this,
+                        "매칭 요청 실패: " + exception.getMessage(),
+                        Toast.LENGTH_LONG
+                ).show());
+            }
+        }).start();
     }
 
     private void renderSavedLocationOnMap(double latitude, double longitude) {
@@ -478,6 +602,14 @@ public class LocationCheckActivity extends AppCompatActivity implements OnMapRea
         return "권한 허용됨: 인증 버튼을 눌러 위치를 확인하세요.\n구역 목록: " + buildZoneSummary();
     }
 
+    @NonNull
+    private String buildRouteSummary() {
+        if (targetZoneId <= 0L || targetZoneName == null || targetZoneName.isBlank()) {
+            return "선택된 목적지 정보가 없습니다.";
+        }
+        return "선택 목적지: " + targetZoneName + "\n방향: " + (directionType == null ? "미정" : directionType);
+    }
+
     private void logVerificationAudit(
             @NonNull GpsTracker.LocationSnapshot snapshot,
             @NonNull VerificationOutcome outcome
@@ -546,18 +678,7 @@ public class LocationCheckActivity extends AppCompatActivity implements OnMapRea
 
     @NonNull
     private String readStream(InputStream stream) throws Exception {
-        if (stream == null) {
-            return "";
-        }
-
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
-            StringBuilder builder = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                builder.append(line);
-            }
-            return builder.toString();
-        }
+        return StreamUtils.readFully(stream);
     }
 
     private float distanceMeters(double lat1, double lng1, double lat2, double lng2) {

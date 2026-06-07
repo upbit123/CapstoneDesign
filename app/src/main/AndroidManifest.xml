@@ -6,6 +6,7 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="true"
@@ -21,6 +22,18 @@
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyAFDV50Agbham9u38SyPq9TznipNsuUmIY" />
         <activity
+            android:name=".MatchingWaitActivity"
+            android:exported="false" />
+        <activity
+            android:name=".DestinationSelectionActivity"
+            android:exported="false" />
+        <activity
+            android:name=".HomeActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ProfileSetupActivity"
+            android:exported="false" />
+        <activity
             android:name=".LocationCheckActivity"
             android:exported="false" />
         <activity
@@ -29,6 +42,16 @@
         <activity
             android:name=".RegisterActivity"
             android:exported="false" />
+        <activity
+            android:name=".PasswordResetActivity"
+            android:exported="false" />
+        <service
+            android:name=".TaxiFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
         <activity
             android:name=".MainActivity"
             android:exported="true">

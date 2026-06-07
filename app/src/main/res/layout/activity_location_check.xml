@@ -29,6 +29,15 @@
         app:layout_constraintStart_toStartOf="parent">
 
         <TextView
+            android:id="@+id/tvRouteSummary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="8dp"
+            android:text="선택 목적지를 불러오는 중입니다..."
+            android:textColor="#5A6472"
+            android:textSize="13sp" />
+
+        <TextView
             android:id="@+id/tvStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

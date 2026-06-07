@@ -25,6 +25,9 @@ public class University {
     @Column(name = "university_name", nullable = false)
     private String universityName;
 
+    @Column(name = "school_email_domain", nullable = false)
+    private String schoolEmailDomain;
+
     // 캠퍼스 대표 위도 좌표
     @Column(name = "latitude")
     private BigDecimal latitude;
@@ -43,6 +46,10 @@ public class University {
 
     public String getUniversityName() {
         return universityName;
+    }
+
+    public String getSchoolEmailDomain() {
+        return schoolEmailDomain;
     }
 
     public BigDecimal getLatitude() {

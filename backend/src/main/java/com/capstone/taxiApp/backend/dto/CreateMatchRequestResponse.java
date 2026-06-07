@@ -6,6 +6,10 @@ import java.time.LocalDateTime;
 public record CreateMatchRequestResponse(
         Long requestId,
         String requestStatus,
+        boolean matched,
+        Long matchGroupId,
+        Long chatRoomId,
+        String roomTitle,
         LocalDateTime requestedAt,
         String message
 ) {

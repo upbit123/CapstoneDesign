@@ -5,41 +5,28 @@ import android.util.Log;
 import android.widget.Button;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.textfield.TextInputEditText;
+import com.google.firebase.FirebaseNetworkException;
 import com.google.firebase.auth.FirebaseAuth;
-
-import java.util.Locale;
-import java.util.Properties;
-import java.util.Random;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
-import javax.mail.Authenticator;
-import javax.mail.Message;
-import javax.mail.MessagingException;
-import javax.mail.PasswordAuthentication;
-import javax.mail.Session;
-import javax.mail.Transport;
-import javax.mail.internet.InternetAddress;
-import javax.mail.internet.MimeMessage;
+import com.google.firebase.auth.FirebaseAuthException;
+import com.google.firebase.auth.FirebaseAuthUserCollisionException;
+import com.google.firebase.auth.FirebaseUser;
 
 public class RegisterActivity extends AppCompatActivity {
 
+    private static final String SCHOOL_EMAIL_DOMAIN = "syuin.ac.kr";
     private static final String TAG = "RegisterActivity";
-    private static final String SENDER_EMAIL = "kimjiihan986@gmail.com";
-    private static final String SENDER_PASSWORD = "mdcs itds hiic yver";
-
-    private final ExecutorService mailExecutor = Executors.newSingleThreadExecutor();
 
     private FirebaseAuth auth;
+    private SignupVerificationRepository signupVerificationRepository;
     private TextInputEditText studentIdEditText;
     private TextInputEditText emailEditText;
     private TextInputEditText verifyCodeEditText;
     private TextInputEditText passwordEditText;
     private TextInputEditText confirmPasswordEditText;
-    private String generatedCode = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,6 +34,7 @@ public class RegisterActivity extends AppCompatActivity {
         setContentView(R.layout.activity_register);
 
         auth = FirebaseAuth.getInstance();
+        signupVerificationRepository = new SignupVerificationRepository();
 
         studentIdEditText = findViewById(R.id.studentIdEditText);
         emailEditText = findViewById(R.id.emailEditText);
@@ -63,30 +51,36 @@ public class RegisterActivity extends AppCompatActivity {
         registerButton.setOnClickListener(v -> registerUser());
     }
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        mailExecutor.shutdownNow();
-    }
-
     private void sendVerificationCode() {
+        String studentId = getText(studentIdEditText);
         String email = getText(emailEditText);
-        if (email.isEmpty() || !email.endsWith("@syuin.ac.kr")) {
-            Toast.makeText(this, "@syuin.ac.kr 이메일을 입력해 주세요.", Toast.LENGTH_SHORT).show();
+        if (studentId.isEmpty()) {
+            Toast.makeText(this, "학번을 먼저 입력해 주세요.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (email.isEmpty() || !email.endsWith("@" + SCHOOL_EMAIL_DOMAIN)) {
+            Toast.makeText(this, "@" + SCHOOL_EMAIL_DOMAIN + " 이메일을 입력해 주세요.", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        generatedCode = String.format(Locale.getDefault(), "%06d", new Random().nextInt(1_000_000));
         Toast.makeText(this, "인증코드를 전송 중입니다...", Toast.LENGTH_SHORT).show();
 
-        mailExecutor.execute(() -> {
-            boolean success = sendVerificationEmail(email, generatedCode);
-            runOnUiThread(() -> Toast.makeText(
-                    RegisterActivity.this,
-                    success ? "인증코드가 발송되었습니다." : "메일 발송 실패",
-                    Toast.LENGTH_SHORT
-            ).show());
-        });
+        new Thread(() -> {
+            try {
+                signupVerificationRepository.sendVerificationCode(studentId, email);
+                runOnUiThread(() -> Toast.makeText(
+                        RegisterActivity.this,
+                        "인증코드가 발송되었습니다.",
+                        Toast.LENGTH_SHORT
+                ).show());
+            } catch (Exception exception) {
+                runOnUiThread(() -> Toast.makeText(
+                        RegisterActivity.this,
+                        "메일 발송 실패: " + exception.getMessage(),
+                        Toast.LENGTH_LONG
+                ).show());
+            }
+        }).start();
     }
 
     private void registerUser() {
@@ -101,13 +95,8 @@ public class RegisterActivity extends AppCompatActivity {
             return;
         }
 
-        if (!email.endsWith("@syuin.ac.kr")) {
+        if (!email.endsWith("@" + SCHOOL_EMAIL_DOMAIN)) {
             Toast.makeText(this, "학교 이메일만 사용할 수 있습니다.", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        if (generatedCode.isEmpty() || !generatedCode.equals(inputCode)) {
-            Toast.makeText(this, "인증코드가 일치하지 않습니다.", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -121,50 +110,130 @@ public class RegisterActivity extends AppCompatActivity {
             return;
         }
 
-        String internalEmail = studentId + "@syuin.ac.kr";
-        auth.createUserWithEmailAndPassword(internalEmail, password)
-                .addOnCompleteListener(this, task -> {
-                    if (task.isSuccessful()) {
-                        Toast.makeText(this, "회원가입이 완료되었습니다.", Toast.LENGTH_SHORT).show();
-                        auth.signOut();
-                        finish();
-                    } else {
-                        String error = task.getException() != null ? task.getException().getMessage() : "가입 실패";
-                        Toast.makeText(this, "가입 오류: " + error, Toast.LENGTH_LONG).show();
+        new Thread(() -> {
+            try {
+                signupVerificationRepository.verifyCode(studentId, email, inputCode);
+                runOnUiThread(() -> auth.createUserWithEmailAndPassword(email, password)
+                        .addOnCompleteListener(this, task -> {
+                            if (task.isSuccessful()) {
+                                syncNewUserToBackend(studentId);
+                            } else {
+                                Exception exception = task.getException();
+                                if (exception instanceof FirebaseAuthUserCollisionException) {
+                                    signInExistingAccountAndSync(studentId, email, password);
+                                    return;
+                                }
+                                if (exception != null) {
+                                    Log.e(TAG, "Firebase signup failed", exception);
+                                }
+                                Toast.makeText(
+                                        this,
+                                        buildFirebaseSignupErrorMessage(exception),
+                                        Toast.LENGTH_LONG
+                                ).show();
+                            }
+                        }));
+            } catch (Exception exception) {
+                runOnUiThread(() -> Toast.makeText(
+                        RegisterActivity.this,
+                        "학생 인증 실패: " + exception.getMessage(),
+                        Toast.LENGTH_LONG
+                ).show());
+            }
+        }).start();
+    }
+
+    private void signInExistingAccountAndSync(
+            @NonNull String studentId,
+            @NonNull String email,
+            @NonNull String password
+    ) {
+        auth.signInWithEmailAndPassword(email, password)
+                .addOnCompleteListener(this, signInTask -> {
+                    if (signInTask.isSuccessful()) {
+                        Toast.makeText(
+                                this,
+                                "이미 가입된 이메일입니다. 기존 계정을 연결합니다.",
+                                Toast.LENGTH_LONG
+                        ).show();
+                        syncNewUserToBackend(studentId);
+                        return;
                     }
+
+                    Exception signInException = signInTask.getException();
+                    if (signInException != null) {
+                        Log.e(TAG, "Existing Firebase account sign-in failed", signInException);
+                    }
+                    String message = signInException == null
+                            ? "이미 가입된 이메일입니다. 비밀번호를 확인하거나 비밀번호 찾기를 이용하세요."
+                            : "이미 가입된 이메일입니다. 비밀번호를 확인하거나 비밀번호 찾기를 이용하세요. "
+                            + signInException.getMessage();
+                    Toast.makeText(this, message, Toast.LENGTH_LONG).show();
                 });
     }
 
-    private boolean sendVerificationEmail(String recipientEmail, String code) {
-        Properties props = new Properties();
-        props.put("mail.smtp.host", "smtp.gmail.com");
-        props.put("mail.smtp.socketFactory.port", "465");
-        props.put("mail.smtp.socketFactory.class", "javax.net.ssl.SSLSocketFactory");
-        props.put("mail.smtp.auth", "true");
-        props.put("mail.smtp.port", "465");
-
-        Session session = Session.getDefaultInstance(props, new Authenticator() {
-            @Override
-            protected PasswordAuthentication getPasswordAuthentication() {
-                return new PasswordAuthentication(SENDER_EMAIL, SENDER_PASSWORD);
-            }
-        });
-
-        try {
-            MimeMessage message = new MimeMessage(session);
-            message.setFrom(new InternetAddress(SENDER_EMAIL));
-            message.addRecipient(Message.RecipientType.TO, new InternetAddress(recipientEmail));
-            message.setSubject("[SU TAXI] 본인인증 코드입니다.");
-            message.setText("인증코드는 [" + code + "] 입니다.");
-            Transport.send(message);
-            return true;
-        } catch (MessagingException e) {
-            Log.e(TAG, "Failed to send verification email", e);
-            return false;
+    private void syncNewUserToBackend(@NonNull String studentId) {
+        FirebaseUser currentUser = auth.getCurrentUser();
+        if (currentUser == null) {
+            Toast.makeText(this, "회원가입 후 사용자 정보를 찾을 수 없습니다.", Toast.LENGTH_LONG).show();
+            return;
         }
+
+        currentUser.getIdToken(true).addOnCompleteListener(task -> {
+            if (!task.isSuccessful() || task.getResult() == null || task.getResult().getToken() == null) {
+                Toast.makeText(this, "회원가입 토큰 발급에 실패했습니다.", Toast.LENGTH_LONG).show();
+                return;
+            }
+
+            String idToken = task.getResult().getToken();
+            String displayName = currentUser.getDisplayName() == null ? "" : currentUser.getDisplayName();
+
+            new Thread(() -> {
+                try {
+                    backendSyncAfterSignup(idToken, studentId, displayName);
+                    runOnUiThread(() -> {
+                        Toast.makeText(this, "회원가입이 완료되었습니다.", Toast.LENGTH_SHORT).show();
+                        auth.signOut();
+                        finish();
+                    });
+                } catch (Exception exception) {
+                    runOnUiThread(() -> Toast.makeText(
+                            this,
+                            "백엔드 계정 연동 실패: " + exception.getMessage(),
+                            Toast.LENGTH_LONG
+                    ).show());
+                }
+            }).start();
+        });
+    }
+
+    private void backendSyncAfterSignup(
+            @NonNull String idToken,
+            @NonNull String studentId,
+            @NonNull String displayName
+    ) throws Exception {
+        BackendAuthRepository backendAuthRepository = new BackendAuthRepository();
+        backendAuthRepository.loginWithFirebase(idToken, studentId, displayName);
     }
 
     private String getText(TextInputEditText editText) {
         return editText.getText() == null ? "" : editText.getText().toString().trim();
+    }
+
+    private String buildFirebaseSignupErrorMessage(Exception exception) {
+        if (exception == null) {
+            return "가입 오류: 알 수 없는 오류";
+        }
+
+        if (exception instanceof FirebaseNetworkException) {
+            return "가입 오류: Firebase 네트워크 오류입니다. 에뮬레이터/기기의 인터넷 연결과 시간을 확인하세요.";
+        }
+
+        if (exception instanceof FirebaseAuthException) {
+            FirebaseAuthException firebaseAuthException = (FirebaseAuthException) exception;
+            return "가입 오류: " + firebaseAuthException.getErrorCode() + " - " + firebaseAuthException.getMessage();
+        }
+
+        return "가입 오류: " + exception.getClass().getSimpleName() + " - " + exception.getMessage();
     }
 }

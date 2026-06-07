@@ -407,6 +407,72 @@ CREATE INDEX idx_chat_room_members_room
 CREATE INDEX idx_app_users_university
     ON app_users (university_id);
 
+MERGE INTO service_zones sz
+USING (
+    SELECT 1 AS zone_id,
+           1 AS university_id,
+           '삼육대학교 정문' AS zone_name,
+           'SCHOOL' AS zone_type,
+           37.6428200 AS latitude,
+           127.1059700 AS longitude,
+           120 AS radius_m,
+           1 AS is_active
+    FROM dual
+    UNION ALL
+    SELECT 2 AS zone_id,
+           1 AS university_id,
+           '삼육대학교 후문' AS zone_name,
+           'SCHOOL' AS zone_type,
+           37.6415600 AS latitude,
+           127.1041400 AS longitude,
+           120 AS radius_m,
+           1 AS is_active
+    FROM dual
+    UNION ALL
+    SELECT 3 AS zone_id,
+           1 AS university_id,
+           '화랑대역 1번 출구' AS zone_name,
+           'STATION' AS zone_type,
+           37.6192200 AS latitude,
+           127.0847600 AS longitude,
+           150 AS radius_m,
+           1 AS is_active
+    FROM dual
+    UNION ALL
+    SELECT 4 AS zone_id,
+           1 AS university_id,
+           '태릉입구역 6번 출구' AS zone_name,
+           'STATION' AS zone_type,
+           37.6180100 AS latitude,
+           127.0759200 AS longitude,
+           150 AS radius_m,
+           1 AS is_active
+    FROM dual
+    UNION ALL
+    SELECT 5 AS zone_id,
+           1 AS university_id,
+           '기숙사 앞 탑승존' AS zone_name,
+           'CUSTOM' AS zone_type,
+           37.6437300 AS latitude,
+           127.1066800 AS longitude,
+           80 AS radius_m,
+           1 AS is_active
+    FROM dual
+) src
+ON (sz.zone_id = src.zone_id)
+WHEN MATCHED THEN
+    UPDATE SET
+        sz.university_id = src.university_id,
+        sz.zone_name = src.zone_name,
+        sz.zone_type = src.zone_type,
+        sz.latitude = src.latitude,
+        sz.longitude = src.longitude,
+        sz.radius_m = src.radius_m,
+        sz.is_active = src.is_active
+WHEN NOT MATCHED THEN
+    INSERT (zone_id, university_id, zone_name, zone_type, latitude, longitude, radius_m, is_active)
+    VALUES (src.zone_id, src.university_id, src.zone_name, src.zone_type, src.latitude, src.longitude, src.radius_m, src.is_active);
+
 COMMENT ON TABLE universities IS
     '학교 기본 정보 테이블입니다. 학교명, 학교 이메일 도메인, 위치 정보를 저장합니다.';
 

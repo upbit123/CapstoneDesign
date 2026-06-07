@@ -8,8 +8,6 @@ import java.time.LocalDateTime;
 
 // 인증된 위치 기반으로 합승 요청을 생성할 때 사용하는 요청 모델이다.
 public record CreateMatchRequestRequest(
-        @NotNull Long userId,
-        @NotNull Long universityId,
         @NotNull Long startZoneId,
         @NotNull Long targetZoneId,
         @NotNull String directionType,

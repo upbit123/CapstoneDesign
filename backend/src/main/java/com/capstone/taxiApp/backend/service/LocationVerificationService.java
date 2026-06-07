@@ -1,5 +1,6 @@
 package com.capstone.taxiApp.backend.service;
 
+import com.capstone.taxiApp.backend.dto.AuthenticatedUser;
 import com.capstone.taxiApp.backend.dto.VerificationPolicyResponse;
 import com.capstone.taxiApp.backend.dto.VerifyHostDeviceLocationRequest;
 import com.capstone.taxiApp.backend.dto.VerifyLocationRequest;
@@ -83,9 +84,9 @@ public class LocationVerificationService {
     // 앱 단말 GPS 좌표를 N개 원형 구역과 순서대로 비교해 첫 번째 포함 구역을 찾는다.
     // 결과(성공/실패/정확도부족)와 매칭 구역 정보를 DB에 저장한 뒤 응답으로 반환한다.
     @Transactional
-    public VerifyLocationResponse verify(VerifyLocationRequest request) {
+    public VerifyLocationResponse verify(AuthenticatedUser authenticatedUser, VerifyLocationRequest request) {
         // 인증에 사용할 정책 목록 구성 (캠퍼스 경계 + 서비스 존)
-        List<EffectivePolicy> policies = buildEffectivePolicies(request.universityId());
+        List<EffectivePolicy> policies = buildEffectivePolicies(authenticatedUser.universityId());
         // LOCATION_LOAD_TEST 목적 코드는 정책 없이도 좌표만 저장 가능하도록 허용한다.
         boolean isLocationLoadTest = PURPOSE_LOCATION_LOAD_TEST.equalsIgnoreCase(request.requestPurpose());
 
@@ -146,8 +147,8 @@ public class LocationVerificationService {
 
         // 판정 결과를 location_verifications 테이블에 저장한다.
         LocationVerificationRecord verificationRecord = new LocationVerificationRecord();
-        verificationRecord.setUserId(request.userId());
-        verificationRecord.setUniversityId(request.universityId());
+        verificationRecord.setUserId(authenticatedUser.userId());
+        verificationRecord.setUniversityId(authenticatedUser.universityId());
         verificationRecord.setRequestPurpose(request.requestPurpose());
         verificationRecord.setLatitude(request.latitude());               // 앱이 보낸 원본 GPS 위도
         verificationRecord.setLongitude(request.longitude());             // 앱이 보낸 원본 GPS 경도
@@ -189,13 +190,14 @@ public class LocationVerificationService {
     // 개발/테스트 목적으로 에뮬레이터 Location 설정 없이 위치를 빠르게 저장할 때 사용한다.
     // IP 기반 위치의 정확도는 약 3km이므로 상용 인증에는 적합하지 않다.
     @Transactional
-    public VerifyLocationResponse verifyFromHostDevice(VerifyHostDeviceLocationRequest request) {
+    public VerifyLocationResponse verifyFromHostDevice(
+            AuthenticatedUser authenticatedUser,
+            VerifyHostDeviceLocationRequest request
+    ) {
         // ipapi.co에서 호스트 IP 기반 위도/경도를 조회한다.
         HostDeviceLocation hostDeviceLocation = resolveHostDeviceLocation();
         // 조회한 좌표를 GPS 요청 형식으로 변환해 기존 verify() 로직을 재사용한다.
         VerifyLocationRequest verifyLocationRequest = new VerifyLocationRequest(
-                request.userId(),
-                request.universityId(),
                 // requestPurpose가 null이면 테스트 코드로 처리해 정책 없이도 저장 가능하게 한다.
                 request.requestPurpose() != null ? request.requestPurpose() : PURPOSE_LOCATION_LOAD_TEST,
                 hostDeviceLocation.latitude,
@@ -203,7 +205,7 @@ public class LocationVerificationService {
                 HOST_LOCATION_ACCURACY_METERS, // IP 위치 오차 3000m를 정확도 값으로 사용한다.
                 System.currentTimeMillis()     // 서버 처리 시각을 캡처 시각으로 기록한다.
         );
-        return verify(verifyLocationRequest);
+        return verify(authenticatedUser, verifyLocationRequest);
     }
 
     // 인증에 사용할 최종 정책 목록을 구성하는 내부 메서드.

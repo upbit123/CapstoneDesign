@@ -61,6 +61,9 @@ public class MatchRequest {
     @Column(name = "active_request_flag", nullable = false)
     private Integer activeRequestFlag;
 
+    @Column(name = "matched_at")
+    private LocalDateTime matchedAt;
+
     public Long getRequestId() {
         return requestId;
     }
@@ -143,5 +146,13 @@ public class MatchRequest {
 
     public void setActiveRequestFlag(Integer activeRequestFlag) {
         this.activeRequestFlag = activeRequestFlag;
+    }
+
+    public LocalDateTime getMatchedAt() {
+        return matchedAt;
+    }
+
+    public void setMatchedAt(LocalDateTime matchedAt) {
+        this.matchedAt = matchedAt;
     }
 }
