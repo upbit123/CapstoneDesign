@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1037107830527",
+    "project_id": "login-56025",
+    "storage_bucket": "login-56025.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1037107830527:android:8eb2fa394a128bbdfb76ca",
+        "android_client_info": {
+          "package_name": "com.capstone.taxiApp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAzELqt-q4UOiy8JCEZT3Lg86P3COJ2I2A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
